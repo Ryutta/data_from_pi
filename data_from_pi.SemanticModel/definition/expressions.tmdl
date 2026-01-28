@@ -1,0 +1,54 @@
+expression PI_System_URL = "https://hinuta105.ccit.ad.sharedom.net" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+	lineageTag: de83c7fa-5e54-46e8-981c-d2d5ccaed954
+	queryGroup: 事業所毎に設定
+
+	annotation PBI_NavigationStepName = ナビゲーション
+
+	annotation PBI_ResultType = Text
+
+expression PI_Server_Name = "HINUTA101C" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+	lineageTag: b99dd321-3cf6-4ffd-b357-92ee3eac8b26
+	queryGroup: 事業所毎に設定
+
+	annotation PBI_NavigationStepName = ナビゲーション
+
+	annotation PBI_ResultType = Text
+
+expression PI_Tag = "ADAC1A.PV,ADAC1B.PV" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+	lineageTag: 362cb718-4d16-4191-ab2c-b95277e38bc9
+	queryGroup: 取得タグの入力
+
+	annotation PBI_NavigationStepName = ナビゲーション
+
+	annotation PBI_ResultType = Text
+
+expression recorded_or_interpolated = "recorded" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+	lineageTag: 74054763-7908-4830-8a91-3948b8c6cb6f
+	queryGroup: '実測値 or 補間値'
+
+	annotation PBI_ResultType = Text
+
+expression start_time = "*-3d" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+	lineageTag: a725db18-8d17-440c-9451-d04a2496eb5b
+	queryGroup: パラメーター
+
+	annotation PBI_ResultType = Text
+
+expression end_time = "*-4h" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+	lineageTag: 4c71baa3-76ff-4b21-b1ca-6400c1364a9d
+	queryGroup: パラメーター
+
+	annotation PBI_ResultType = Text
+
+expression interval = "1h" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+	lineageTag: 0eba127a-3dc5-4b3d-abe5-630d154afdd5
+	queryGroup: パラメーター
+
+	annotation PBI_ResultType = Text
+
+expression other = " " meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+	lineageTag: 720168ea-cf96-41d7-94aa-2fbc76a7a878
+	queryGroup: 必要に応じて追加パラメータを設定
+
+	annotation PBI_ResultType = Text
+

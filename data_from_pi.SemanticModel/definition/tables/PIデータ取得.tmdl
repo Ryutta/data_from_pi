@@ -1,0 +1,59 @@
+table PIデータ取得
+	lineageTag: 053cfd57-0085-4c93-9ba6-72667eb99b79
+
+	column Timestamp
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 4ca85c71-0891-4320-898c-c319dba94769
+		summarizeBy: none
+		sourceColumn: Timestamp
+
+		variation バリエーション
+			isDefault
+			relationship: a476ed43-c70c-4d3c-87fe-0ad4e7232b89
+			defaultHierarchy: LocalDateTable_4e235354-5df2-4f4a-92c1-3045edb1243c.日付の階層
+
+		annotation SummarizationSetBy = Automatic
+
+	column Value
+		dataType: double
+		lineageTag: c51a82c8-3d0a-4bb7-8946-7ff82b8bd230
+		summarizeBy: sum
+		sourceColumn: Value
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Tag
+		dataType: string
+		lineageTag: 0d9f3745-a034-418f-905e-382a9bca55f9
+		summarizeBy: none
+		sourceColumn: Tag
+
+		annotation SummarizationSetBy = Automatic
+
+	partition PIデータ取得 = m
+		mode: import
+		source =
+				let
+				    ソース = Table.FromList(Text.Split( PI_Tag, ","), Splitter.SplitTextByDelimiter(","), {"Tag"}),
+				    tagdata取得API列の作成 = Table.AddColumn(ソース, "tagdata取得API", each  PI_System_URL　& "/piwebapi/points?path=\\" & PI_Server_Name & "\" & [Tag]),
+				    tagdata取得 = Table.AddColumn(tagdata取得API列の作成, "tagdata", each Json.Document(Web.Contents([tagdata取得API]))),
+				    WEBIDの展開 = Table.ExpandRecordColumn(tagdata取得, "tagdata", {"WebId"}, {"WebId"}),
+				    maxCount = "&maxCount=20160",
+				    tadrecord取得API列の作成 = Table.AddColumn(WEBIDの展開, "tagrecord取得API", each PI_System_URL　& "/piwebapi/streams/" &[WebId] & "/"& recorded_or_interpolated &"?startTime=" & start_time & "&endTime=" & end_time & "&interval="　& interval & maxCount & other),
+				    tadrecord取得 = Table.AddColumn(tadrecord取得API列の作成, "tagrecord", each Json.Document(Web.Contents([tagrecord取得API]))),
+				    削除された列 = Table.RemoveColumns(tadrecord取得,{"tagdata取得API", "WebId", "tagrecord取得API"}),
+				    dataの展開 = Table.ExpandRecordColumn(削除された列, "tagrecord", {"Items"}, {"Items"}),
+				    #"展開された Items" = Table.ExpandListColumn(dataの展開, "Items"),
+				    #"展開された Items1" = Table.ExpandRecordColumn(#"展開された Items", "Items", {"Timestamp", "Value"}, {"Timestamp", "Value"}),
+				    変更された型 = Table.TransformColumnTypes(#"展開された Items1",{{"Tag", type text}, {"Timestamp", type datetime}, {"Value", type number}}),
+				    並べ替えられた行 = Table.Sort(変更された型,{{"Timestamp", Order.Ascending}})
+				in
+				    並べ替えられた行
+
+	annotation PBI_NavigationStepName = ナビゲーション
+
+	annotation PBI_ResultType = Table
+
