@@ -44,6 +44,18 @@ PI Web API は標準的な REST API であるため、R言語からも `httr` �
     *   `httr`: HTTPリクエスト用
     *   `jsonlite`: JSONパース用
 
+### 認証設定のセットアップ (重要)
+
+セキュリティ上の理由から、ユーザー名とパスワードはスクリプト内に直接記述せず、別の設定ファイルで管理します。
+
+1. `auth_config_template.R` をコピーし、ファイル名を `auth_config.R` に変更してください。
+2. `auth_config.R` を開き、`AUTH_USER` と `AUTH_PASS` に自身の認証情報を入力して保存してください。
+   ```r
+   AUTH_USER <- "your_username"
+   AUTH_PASS <- "your_password"
+   ```
+3. `auth_config.R` は `.gitignore` に登録されているため、Gitリポジトリにはコミットされません。
+
 ### R サンプルコード
 
 以下は、Power BI で行われているデータ取得プロセスを R で再現するサンプルコードです。
@@ -64,14 +76,13 @@ start_time <- "*-3d"
 end_time <- "*-4h"
 mode <- "recorded"                                    # recorded_or_interpolated
 
-# 認証設定 (環境に合わせて変更してください)
-# Kerberos (Windows統合認証) の場合は use_default_credentials = TRUE などを検討
-# Basic認証の場合は以下のようにユーザー名とパスワードを設定
-# user <- "YOUR_USERNAME"
-# password <- "YOUR_PASSWORD"
-# auth <- authenticate(user, password)
-# ここでは例として認証なし、またはデフォルト認証を想定して auth 変数を空にします
-auth <- NULL # authenticate(user, password, type = "basic") or authenticate(":", "", type = "gssnegotiate")
+# 認証設定
+if (file.exists("auth_config.R")) {
+  source("auth_config.R")
+  auth <- authenticate(AUTH_USER, AUTH_PASS)
+} else {
+  stop("auth_config.R が見つかりません。auth_config_template.R をコピーして作成してください。")
+}
 
 
 # --- データ取得関数 ---

@@ -39,8 +39,13 @@ PI_SERVER_NAME <- "HINUTA101C"
 TAG_NAMES <- c("ADAC1A.PV", "ADAC1B.PV")
 
 # 認証設定
-# デフォルトの認証情報（Kerberos/Negotiate）を使用します
-auth_config <- use_default_auth()
+# 'auth_config.R' から認証情報を読み込みます
+if (file.exists("auth_config.R")) {
+  source("auth_config.R")
+  auth_config <- authenticate(AUTH_USER, AUTH_PASS)
+} else {
+  stop("認証設定ファイル 'auth_config.R' が見つかりません。'auth_config_template.R' をコピーして設定してください。")
+}
 ssl_config <- config(ssl_verifypeer = 0) # 社内サーバー等のためSSL検証をスキップ
 ```
 
