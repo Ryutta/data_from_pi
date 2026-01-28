@@ -12,12 +12,12 @@ PI_SERVER_NAME <- "HINUTA101C"
 TAG_NAMES <- c("ADAC1A.PV", "ADAC1B.PV")
 
 # Authentication
-# PI Web API usually uses Negotiate/Kerberos by default.
-# If Basic Auth is needed, uncomment and fill below:
-# AUTH_USER <- "your_username"
-# AUTH_PASS <- "your_password"
-# auth_config <- authenticate(AUTH_USER, AUTH_PASS)
-auth_config <- use_default_auth() # Uses current user credentials (Kerberos/Negotiate)
+if (file.exists("auth_config.R")) {
+  source("auth_config.R")
+  auth_config <- authenticate(AUTH_USER, AUTH_PASS)
+} else {
+  stop("Authentication configuration file 'auth_config.R' is missing. Please copy 'auth_config_template.R' to 'auth_config.R' and set your credentials.")
+}
 
 # Disable SSL verification for internal servers (optional, use with caution)
 ssl_config <- config(ssl_verifypeer = 0)
