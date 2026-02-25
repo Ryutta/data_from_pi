@@ -14,7 +14,7 @@ expression PI_Server_Name = "HINUTA101C" meta [IsParameterQuery=true, Type="Any"
 
 	annotation PBI_ResultType = Text
 
-expression PI_Tag = "ADAC1A.PV,ADAC1B.PV" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+expression PI_Tag = "M2TI4405.PV,M2PI4407.PV,M2PI4410W.PV,M2PI4411W.PV,M2FC4403.PV,M2CI2901.CPV" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
 	lineageTag: 362cb718-4d16-4191-ab2c-b95277e38bc9
 	queryGroup: 取得タグの入力
 
@@ -51,4 +51,3 @@ expression other = " " meta [IsParameterQuery=true, Type="Any", IsParameterQuery
 	queryGroup: 必要に応じて追加パラメータを設定
 
 	annotation PBI_ResultType = Text
-

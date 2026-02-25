@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 このレポートでは、PI Web APIを使用してPIシステムからデータを取得し、Rを用いて可視化する一連の流れを示します。
 今回は、以下のタグのデータを取得対象とします：
-**ADAC1A.PV** および **ADAC1B.PV**
+**M2TI4405.PV**, **M2PI4407.PV**, **M2PI4410W.PV**, **M2PI4411W.PV**, **M2FC4403.PV**, **M2CI2901.CPV**
 
 ## ステップ 1: ライブラリの読み込み
 
@@ -36,7 +36,7 @@ PI Web APIへの接続パラメータを設定します。
 # PIシステムの設定
 PI_WEB_API_BASE_URL <- "https://hinuta105.ccit.ad.sharedom.net/piwebapi"
 PI_SERVER_NAME <- "HINUTA101C"
-TAG_NAMES <- c("ADAC1A.PV", "ADAC1B.PV")
+TAG_NAMES <- c("M2TI4405.PV", "M2PI4407.PV", "M2PI4410W.PV", "M2PI4411W.PV", "M2FC4403.PV", "M2CI2901.CPV")
 
 # 認証設定
 # 'auth_config.R' から認証情報を読み込みます
@@ -135,7 +135,7 @@ if (nrow(all_data) > 0) {
   ggplot(all_data, aes(x = Timestamp, y = Value, color = Tag)) +
     geom_line() +
     labs(title = "PIデータトレンド",
-         subtitle = "ADAC1A.PV vs ADAC1B.PV",
+         subtitle = paste(TAG_NAMES, collapse = ", "),
          x = "日時",
          y = "値") +
     theme_minimal()
