@@ -9,7 +9,7 @@ library(lubridate)
 # --- Configuration ---
 PI_WEB_API_BASE_URL <- "https://hinuta105.ccit.ad.sharedom.net/piwebapi"
 PI_SERVER_NAME <- "HINUTA101C"
-TAG_NAMES <- c("ADAC1A.PV", "ADAC1B.PV")
+TAG_NAMES <- c("M2TI4405.PV", "M2PI4407.PV", "M2PI4410W.PV", "M2PI4411W.PV", "M2FC4403.PV", "M2CI2901.CPV")
 
 # Authentication
 if (file.exists("auth_config.R")) {
@@ -76,10 +76,16 @@ get_recorded_data <- function(web_id, tag_name, start_time = "*-3d", end_time = 
     return(NULL)
   }
 
+  # Handle complex value (e.g. Digital State object)
+  vals <- items$Value
+  if (is.data.frame(vals) && "Value" %in% names(vals)) {
+    vals <- vals$Value
+  }
+
   # Select relevant columns and add TagName
   df <- data.frame(
     Timestamp = items$Timestamp,
-    Value = items$Value,
+    Value = vals,
     Tag = tag_name,
     stringsAsFactors = FALSE
   )
