@@ -78,8 +78,17 @@ get_recorded_data <- function(web_id, tag_name, start_time = "*-3d", end_time = 
 
   # Handle complex value (e.g. Digital State object)
   vals <- items$Value
-  if (is.data.frame(vals) && "Value" %in% names(vals)) {
-    vals <- vals$Value
+  if (is.data.frame(vals)) {
+    if ("Value" %in% names(vals)) {
+      vals <- vals$Value
+    } else {
+      vals <- vals[[1]]
+    }
+  }
+
+  # Ensure atomic vector (handle lists)
+  if (is.list(vals)) {
+    vals <- unlist(vals)
   }
 
   # Select relevant columns and add TagName
