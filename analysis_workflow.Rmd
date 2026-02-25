@@ -87,19 +87,29 @@ get_recorded_data <- function(web_id, tag_name, start_time = "*-3d", end_time = 
 
   if (is.null(items) || length(items) == 0) return(NULL)
 
-  # Handle complex value (e.g. Digital State object)
+  # Handle complex value (e.g. Digital State object or System Error)
   vals <- items$Value
+
   if (is.data.frame(vals)) {
+    # If it's a data frame, we want the "Value" column if it exists, otherwise the first column.
+    # We must NOT unlist the entire data frame as that concatenates columns.
     if ("Value" %in% names(vals)) {
       vals <- vals$Value
     } else {
       vals <- vals[[1]]
     }
-  }
-
-  # Ensure atomic vector (handle lists)
-  if (is.list(vals)) {
-    vals <- unlist(vals)
+  } else if (is.list(vals)) {
+    # If it's a list of objects (e.g. from JSON), extract the Value field or the first element
+    # Use sapply to ensure we get a vector of the same length, handling NULLs
+    vals <- sapply(vals, function(x) {
+      if (is.list(x) || is.data.frame(x)) {
+         if ("Value" %in% names(x)) return(x$Value)
+         if (length(x) > 0) return(x[[1]])
+         return(NA)
+      } else {
+         return(x)
+      }
+    })
   }
 
   data.frame(
