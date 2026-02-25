@@ -1,5 +1,0 @@
-relationship a476ed43-c70c-4d3c-87fe-0ad4e7232b89
-	joinOnDateBehavior: datePartOnly
-	fromColumn: PIデータ取得.Timestamp
-	toColumn: LocalDateTable_4e235354-5df2-4f4a-92c1-3045edb1243c.Date
-
