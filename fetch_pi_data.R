@@ -76,10 +76,16 @@ get_recorded_data <- function(web_id, tag_name, start_time = "*-3d", end_time = 
     return(NULL)
   }
 
+  # Handle complex value (e.g. Digital State object)
+  vals <- items$Value
+  if (is.data.frame(vals) && "Value" %in% names(vals)) {
+    vals <- vals$Value
+  }
+
   # Select relevant columns and add TagName
   df <- data.frame(
     Timestamp = items$Timestamp,
-    Value = items$Value,
+    Value = vals,
     Tag = tag_name,
     stringsAsFactors = FALSE
   )
