@@ -53,7 +53,7 @@ ssl_config <- config(ssl_verifypeer = 0) # 社内サーバー等のためSSL検�
 
 APIと対話するためのヘルパー関数を定義します。
 1. `get_web_id`: タグ名からWebIDを取得する関数
-2. `get_recorded_data`: WebIDを使用して指定期間の記録データ（Recorded Data）を取得する関数
+2. `get_interpolated_data`: WebIDを使用して指定期間・周期の補間データ（Interpolated Data）を取得する関数
 
 ```{r functions}
 get_web_id <- function(tag_name) {
@@ -71,10 +71,10 @@ get_web_id <- function(tag_name) {
   return(content_json$WebId)
 }
 
-get_recorded_data <- function(web_id, tag_name, start_time = "*-3d", end_time = "*") {
-  url <- paste0(PI_WEB_API_BASE_URL, "/streams/", web_id, "/recorded")
+get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01", end_time = "*", interval = "1d") {
+  url <- paste0(PI_WEB_API_BASE_URL, "/streams/", web_id, "/interpolated")
 
-  response <- GET(url, query = list(startTime = start_time, endTime = end_time),
+  response <- GET(url, query = list(startTime = start_time, endTime = end_time, interval = interval),
                   auth_config, ssl_config)
 
   if (status_code(response) != 200) {
@@ -123,7 +123,7 @@ get_recorded_data <- function(web_id, tag_name, start_time = "*-3d", end_time = 
 
 ## ステップ 4: データ取得の実行
 
-定義したタグのリストをループ処理し、WebIDを取得した後、過去3日間（`*-3d`）のデータを取得します。
+定義したタグのリストをループ処理し、WebIDを取得した後、2023年以降の日次データ（`interval = "1d"`）を取得します。
 
 ```{r fetch_data}
 all_data <- data.frame()
@@ -132,7 +132,7 @@ for (tag in TAG_NAMES) {
   web_id <- get_web_id(tag)
 
   if (!is.null(web_id)) {
-    tag_data <- get_recorded_data(web_id, tag)
+    tag_data <- get_interpolated_data(web_id, tag)
     if (!is.null(tag_data)) {
       all_data <- rbind(all_data, tag_data)
     }
