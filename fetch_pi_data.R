@@ -49,17 +49,18 @@ get_web_id <- function(tag_name) {
   return(content_json$WebId)
 }
 
-#' Get Recorded Data for a WebID
+#' Get Interpolated Data for a WebID
 #' @param web_id The WebId of the stream
 #' @param start_time Start time string (e.g., "*-3d")
 #' @param end_time End time string (e.g., "*")
-#' @return A data frame of the recorded values
-get_recorded_data <- function(web_id, tag_name, start_time = "*-3d", end_time = "*") {
-  url <- paste0(PI_WEB_API_BASE_URL, "/streams/", web_id, "/recorded")
+#' @param interval Interval string (e.g., "1d")
+#' @return A data frame of the interpolated values
+get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01", end_time = "*", interval = "1d") {
+  url <- paste0(PI_WEB_API_BASE_URL, "/streams/", web_id, "/interpolated")
 
   response <- GET(
     url,
-    query = list(startTime = start_time, endTime = end_time),
+    query = list(startTime = start_time, endTime = end_time, interval = interval),
     auth_config,
     ssl_config
   )
@@ -124,7 +125,7 @@ for (tag in TAG_NAMES) {
   web_id <- get_web_id(tag)
 
   if (!is.null(web_id)) {
-    tag_data <- get_recorded_data(web_id, tag)
+    tag_data <- get_interpolated_data(web_id, tag)
 
     if (!is.null(tag_data)) {
       all_data <- rbind(all_data, tag_data)
