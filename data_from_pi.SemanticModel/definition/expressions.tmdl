@@ -28,7 +28,7 @@ expression recorded_or_interpolated = "interpolated" meta [IsParameterQuery=true
 
 	annotation PBI_ResultType = Text
 
-expression start_time = "2023-01-01" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
+expression start_time = "2023-01-01T00:00:00+09:00" meta [IsParameterQuery=true, Type="Any", IsParameterQueryRequired=true]
 	lineageTag: a725db18-8d17-440c-9451-d04a2496eb5b
 	queryGroup: パラメーター
 
