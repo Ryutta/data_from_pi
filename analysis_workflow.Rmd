@@ -71,7 +71,7 @@ get_web_id <- function(tag_name) {
   return(content_json$WebId)
 }
 
-get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01", end_time = "*", interval = "1d") {
+get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01T00:00:00+09:00", end_time = "*", interval = "1d") {
   url <- paste0(PI_WEB_API_BASE_URL, "/streams/", web_id, "/interpolated")
 
   response <- GET(url, query = list(startTime = start_time, endTime = end_time, interval = interval),
@@ -149,8 +149,8 @@ head(all_data)
 
 ```{r plot}
 if (nrow(all_data) > 0) {
-  # 型変換
-  all_data$Timestamp <- ymd_hms(all_data$Timestamp)
+  # 型変換とタイムゾーン変換（日本時間）
+  all_data$Timestamp <- with_tz(ymd_hms(all_data$Timestamp), tzone = "Asia/Tokyo")
   all_data$Value <- as.numeric(all_data$Value)
 
   # 数値変換でNAになったデータ（システムステート等）を除去
@@ -166,5 +166,23 @@ if (nrow(all_data) > 0) {
     theme_minimal()
 } else {
   print("表示可能なデータがありません。")
+}
+```
+
+## ステップ 6: 特定タグのテーブル表示
+
+**M2PI4410W.PV** のデータをテーブルとして表示します。
+
+```{r table_display}
+if (nrow(all_data) > 0) {
+  m2pi4410w_data <- all_data %>%
+    filter(Tag == "M2PI4410W.PV") %>%
+    arrange(Timestamp)
+
+  if (nrow(m2pi4410w_data) > 0) {
+    knitr::kable(m2pi4410w_data, caption = "M2PI4410W.PV データテーブル")
+  } else {
+    print("M2PI4410W.PV のデータはありません。")
+  }
 }
 ```

@@ -55,7 +55,7 @@ get_web_id <- function(tag_name) {
 #' @param end_time End time string (e.g., "*")
 #' @param interval Interval string (e.g., "1d")
 #' @return A data frame of the interpolated values
-get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01", end_time = "*", interval = "1d") {
+get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01T00:00:00+09:00", end_time = "*", interval = "1d") {
   url <- paste0(PI_WEB_API_BASE_URL, "/streams/", web_id, "/interpolated")
 
   response <- GET(
@@ -135,8 +135,8 @@ for (tag in TAG_NAMES) {
 
 # Data Cleaning
 if (nrow(all_data) > 0) {
-  # Convert Timestamp to POSIXct
-  all_data$Timestamp <- ymd_hms(all_data$Timestamp)
+  # Convert Timestamp to POSIXct and adjust timezone to Asia/Tokyo
+  all_data$Timestamp <- with_tz(ymd_hms(all_data$Timestamp), tzone = "Asia/Tokyo")
 
   # Convert Value to numeric (handling digital states or errors which might be lists or strings)
   # Note: PI Web API might return a nested object for Value if it's a system state.
@@ -160,6 +160,22 @@ if (nrow(all_data) > 0) {
   # Save the plot
   ggsave("pi_data_plot.png", plot = p, width = 10, height = 6)
   message("Plot saved to pi_data_plot.png")
+
+  # --- Table Output ---
+  m2pi4410w_data <- all_data %>%
+    filter(Tag == "M2PI4410W.PV") %>%
+    arrange(Timestamp)
+
+  if (nrow(m2pi4410w_data) > 0) {
+    message("\n--- M2PI4410W.PV Data Table ---")
+    print(m2pi4410w_data)
+
+    # Save to CSV
+    write.csv(m2pi4410w_data, "m2pi4410w_data.csv", row.names = FALSE)
+    message("M2PI4410W.PV data saved to m2pi4410w_data.csv")
+  } else {
+    message("No data found for M2PI4410W.PV.")
+  }
 
 } else {
   warning("No data retrieved.")
