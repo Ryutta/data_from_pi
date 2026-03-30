@@ -25,6 +25,8 @@ library(jsonlite)
 library(ggplot2)
 library(dplyr)
 library(lubridate)
+library(tidyr)
+library(DT)
 ```
 
 ## ステップ 2: 設定
@@ -169,20 +171,90 @@ if (nrow(all_data) > 0) {
 }
 ```
 
-## ステップ 6: 特定タグのテーブル表示
+## ステップ 6: 総括伝熱係数 (U値) の算出
 
-**M2PI4410W.PV** のデータをテーブルとして表示します。
+取得したデータから、U_Calculation_Method.md に基づいて総括伝熱係数 `U` を算出します。
 
-```{r table_display}
+```{r calculate_u}
 if (nrow(all_data) > 0) {
-  m2pi4410w_data <- all_data %>%
-    filter(Tag == "M2PI4410W.PV") %>%
-    arrange(Timestamp)
+  # データをタグごとに横持ち（ワイドフォーマット）に変換
+  wide_data <- all_data %>%
+    select(Timestamp, Tag, Value) %>%
+    # 重複がある場合は平均をとるか最初の値をとる（日次データなので基本は1日1行）
+    group_by(Timestamp, Tag) %>%
+    summarise(Value = mean(Value, na.rm = TRUE), .groups = 'drop') %>%
+    pivot_wider(names_from = Tag, values_from = Value)
 
-  if (nrow(m2pi4410w_data) > 0) {
-    knitr::kable(m2pi4410w_data, caption = "M2PI4410W.PV データテーブル")
+  # 必要なタグが全て存在するか確認
+  required_tags <- c("M2FC4403.PV", "M2TI4405.PV", "M2PI4410W.PV", "M2PI4407.PV", "M2PI4411W.PV")
+
+  if (all(required_tags %in% names(wide_data))) {
+    # U値の計算プロセス
+    calc_data <- wide_data %>%
+      mutate(
+        # ステップ 1: 熱量 q の算出
+        q = M2FC4403.PV * 2257.05 * 1000 / 3600 / 1000,
+
+        # ステップ 2: ポンプ流量 pump_flow の算出
+        pump_inlet = (M2PI4407.PV / 760 * 101.325) + (950 * 9.81 * (1.4 + 6.125) / 1000),
+        pump_outlet = M2PI4411W.PV + 101.325,
+        lifting_height = (pump_outlet - pump_inlet) * 1000 / 9.81 / 950,
+        # 二次方程式の適用
+        pump_flow = (-0.6857 * lifting_height^2 + 0.8571 * lifting_height + 43.589) * 60 * 950 / 1000,
+
+        # ステップ 3: 温度差の算出
+        t1 = M2TI4405.PV,
+        t2 = t1 + q * 1000 / (pump_flow * 1000 / 3600) / 2.09,
+        # LN は R では log()
+        t3_t4 = 27.838 * log(M2PI4410W.PV + 101.325) - 28.559,
+
+        # ステップ 4: 対数平均温度差 delta_tlm (LMTD)
+        dT1 = t3_t4 - t1,
+        dT2 = t3_t4 - t2,
+        delta_tlm = ifelse(
+          dT1 > 0 & dT2 > 0 & dT1 != dT2,
+          (dT1 - dT2) / log(dT1 / dT2),
+          NA # 計算不可またはゼロ割りの場合
+        ),
+
+        # 最終的な U の算出
+        U = ifelse(
+          !is.na(delta_tlm) & delta_tlm != 0,
+          (q * 1000 * 1000 / 367) / delta_tlm,
+          NA
+        )
+      ) %>%
+      select(Timestamp, q, pump_flow, t1, t2, t3_t4, delta_tlm, U) %>%
+      arrange(desc(Timestamp)) # 最新のデータを上に
+
+    # 計算結果の一部をコンソールに表示
+    head(calc_data)
   } else {
-    print("M2PI4410W.PV のデータはありません。")
+    print("U値の計算に必要なタグのデータが揃っていません。")
   }
+}
+```
+
+## ステップ 7: U値のテーブル表示
+
+計算された U値 および各種中間指標を `DT::datatable` を用いて見やすいテーブルとして表示します。
+
+```{r u_table_display}
+if (exists("calc_data") && nrow(calc_data) > 0) {
+  datatable(
+    calc_data,
+    options = list(
+      pageLength = 10,
+      autoWidth = TRUE,
+      scrollX = TRUE,
+      dom = 'Bfrtip'
+    ),
+    caption = "総括伝熱係数 (U) および関連パラメータの計算結果",
+    rownames = FALSE
+  ) %>%
+    formatRound(columns = c("q", "pump_flow", "t1", "t2", "t3_t4", "delta_tlm", "U"), digits = 2) %>%
+    formatDate("Timestamp", method = "toLocaleString")
+} else {
+  print("表示できる計算結果がありません。")
 }
 ```
