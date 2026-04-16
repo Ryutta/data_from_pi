@@ -224,7 +224,7 @@ if (nrow(all_data) > 0) {
           NA
         )
       ) %>%
-      select(Timestamp, q, pump_flow, t1, t2, t3_t4, delta_tlm, U) %>%
+      select(Timestamp, M2PI4410W = M2PI4410W.PV, q, pump_flow, t1, t2, t3_t4, delta_tlm, U) %>%
       arrange(desc(Timestamp)) # 最新のデータを上に
 
     # 計算結果の一部をコンソールに表示
@@ -252,7 +252,7 @@ if (exists("calc_data") && nrow(calc_data) > 0) {
     caption = "総括伝熱係数 (U) および関連パラメータの計算結果",
     rownames = FALSE
   ) %>%
-    formatRound(columns = c("q", "pump_flow", "t1", "t2", "t3_t4", "delta_tlm", "U"), digits = 2) %>%
+    formatRound(columns = c("M2PI4410W", "q", "pump_flow", "t1", "t2", "t3_t4", "delta_tlm", "U"), digits = 2) %>%
     formatDate("Timestamp", method = "toLocaleString")
 } else {
   print("表示できる計算結果がありません。")
