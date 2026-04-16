@@ -356,35 +356,47 @@ if (exists("calc_data") && nrow(calc_data) > 0 && file.exists("campaign_periods.
       
     print(p_campaign_u)
     
-    # 散布図の作成 2 (詰まり本数 vs ジャケット圧力)
-    p_campaign_nos_p <- ggplot(campaign_results %>% filter(!is.na(NoS)), aes(x = NoS, y = Max_Jacket_P)) +
-      geom_point(aes(color = Type), size = 3, alpha = 0.7) +
-      geom_smooth(method = "lm", se = TRUE, color = "darkred", fill = "pink", alpha = 0.3) +
-      labs(
-        title = "キャンペーン期間ごとの詰まり本数と最大ジャケット圧力の相関",
-        subtitle = "各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ",
-        x = "詰まり本数 (NoS)",
-        y = "最大ジャケット圧力 (M2PI4410W.PV)",
-        color = "期間"
-      ) +
-      theme_minimal()
+    # 散布図の作成 2 (最大ジャケット圧力 vs 詰まり本数)
+    valid_nos_p <- campaign_results %>% filter(!is.na(NoS), !is.na(Max_Jacket_P))
+    if(nrow(valid_nos_p) > 1) {
+      model_p <- lm(NoS ~ Max_Jacket_P, data = valid_nos_p)
+      eq_p <- sprintf("y = %.2fx %s %.2f", coef(model_p)[2], ifelse(coef(model_p)[1] >= 0, "+", "-"), abs(coef(model_p)[1]))
       
-    print(p_campaign_nos_p)
+      p_campaign_nos_p <- ggplot(valid_nos_p, aes(x = Max_Jacket_P, y = NoS)) +
+        geom_point(aes(color = Type), size = 3, alpha = 0.7) +
+        geom_smooth(method = "lm", se = TRUE, color = "darkred", fill = "pink", alpha = 0.3) +
+        labs(
+          title = "キャンペーン期間ごとの最大ジャケット圧力と詰まり本数の相関",
+          subtitle = paste("各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ\n回帰式: ", eq_p),
+          x = "最大ジャケット圧力 (M2PI4410W.PV)",
+          y = "詰まり本数 (NoS)",
+          color = "期間"
+        ) +
+        theme_minimal()
+        
+      print(p_campaign_nos_p)
+    }
     
-    # 散布図の作成 3 (詰まり本数 vs U値)
-    p_campaign_nos_u <- ggplot(campaign_results %>% filter(!is.na(NoS)), aes(x = NoS, y = U_Value)) +
-      geom_point(aes(color = Type), size = 3, alpha = 0.7) +
-      geom_smooth(method = "lm", se = TRUE, color = "darkgreen", fill = "lightgreen", alpha = 0.3) +
-      labs(
-        title = "キャンペーン期間ごとの詰まり本数とU値の相関",
-        subtitle = "各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ",
-        x = "詰まり本数 (NoS)",
-        y = "総括伝熱係数 (U値)",
-        color = "期間"
-      ) +
-      theme_minimal()
+    # 散布図の作成 3 (U値 vs 詰まり本数)
+    valid_nos_u <- campaign_results %>% filter(!is.na(NoS), !is.na(U_Value))
+    if(nrow(valid_nos_u) > 1) {
+      model_u <- lm(NoS ~ U_Value, data = valid_nos_u)
+      eq_u <- sprintf("y = %.2fx %s %.2f", coef(model_u)[2], ifelse(coef(model_u)[1] >= 0, "+", "-"), abs(coef(model_u)[1]))
       
-    print(p_campaign_nos_u)
+      p_campaign_nos_u <- ggplot(valid_nos_u, aes(x = U_Value, y = NoS)) +
+        geom_point(aes(color = Type), size = 3, alpha = 0.7) +
+        geom_smooth(method = "lm", se = TRUE, color = "darkgreen", fill = "lightgreen", alpha = 0.3) +
+        labs(
+          title = "キャンペーン期間ごとのU値と詰まり本数の相関",
+          subtitle = paste("各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ\n回帰式: ", eq_u),
+          x = "総括伝熱係数 (U値)",
+          y = "詰まり本数 (NoS)",
+          color = "期間"
+        ) +
+        theme_minimal()
+        
+      print(p_campaign_nos_u)
+    }
   } else {
     print("キャンペーン評価用のデータが抽出できませんでした。")
   }
