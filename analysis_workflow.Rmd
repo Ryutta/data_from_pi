@@ -73,7 +73,7 @@ get_web_id <- function(tag_name) {
   return(content_json$WebId)
 }
 
-get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01T00:00:00+09:00", end_time = "*", interval = "1d") {
+get_interpolated_data <- function(web_id, tag_name, start_time = "2021-01-01T00:00:00+09:00", end_time = "*", interval = "1d") {
   url <- paste0(PI_WEB_API_BASE_URL, "/streams/", web_id, "/interpolated")
 
   response <- GET(url, query = list(startTime = start_time, endTime = end_time, interval = interval),
@@ -125,7 +125,7 @@ get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01T00:
 
 ## ステップ 4: データ取得の実行
 
-定義したタグのリストをループ処理し、WebIDを取得した後、2023年以降の日次データ（`interval = "1d"`）を取得します。
+定義したタグのリストをループ処理し、WebIDを取得した後、2021年以降の日次データ（`interval = "1d"`）を取得します。
 
 ```{r fetch_data}
 all_data <- data.frame()
@@ -256,5 +256,109 @@ if (exists("calc_data") && nrow(calc_data) > 0) {
     formatDate("Timestamp", method = "toLocaleString")
 } else {
   print("表示できる計算結果がありません。")
+}
+```
+
+## ステップ 8: キャンペーン期間ごとの最大値取得と詰まり本数の評価
+
+`Campaign_Evaluation_Methodology.md` に基づき、各キャンペーンの「初期」と「末期」における最大ジャケット圧力時のデータを抽出し、U値との相関を確認します。
+
+```{r campaign_evaluation}
+if (exists("calc_data") && nrow(calc_data) > 0 && file.exists("campaign_periods.csv")) {
+  # キャンペーン期間データの読み込み
+  campaigns <- read.csv("campaign_periods.csv", stringsAsFactors = FALSE)
+  campaigns$Start_Date <- as.Date(campaigns$Start_Date)
+  campaigns$End_Date <- as.Date(campaigns$End_Date)
+
+  campaign_results <- data.frame()
+
+  for (i in 1:nrow(campaigns)) {
+    period <- campaigns$Period[i]
+    start_d <- campaigns$Start_Date[i]
+    end_d <- campaigns$End_Date[i]
+
+    if (is.na(start_d)) next
+
+    # 初期 (Beginning): 開始日から1ヶ月間
+    beg_end_d <- start_d + months(1)
+    beg_data <- calc_data %>% filter(as.Date(Timestamp) >= start_d & as.Date(Timestamp) <= beg_end_d)
+
+    if (nrow(beg_data) > 0) {
+      max_row <- beg_data[which.max(beg_data$M2PI4410W), ]
+
+      # Use check.names=FALSE style or matching the literal name
+      col_beg <- grep("詰まり本数_前半", names(campaigns), value=TRUE)[1]
+      nos_val <- as.numeric(campaigns[i, col_beg])
+
+      campaign_results <- rbind(campaign_results, data.frame(
+        Period = period,
+        Type = "Beginning",
+        PeriodType = paste0(period, "_Beginning"),
+        Timestamp = max_row$Timestamp,
+        Max_Jacket_P = max_row$M2PI4410W,
+        U_Value = max_row$U,
+        NoS = nos_val
+      ))
+    }
+
+    # 末期 (End): 終了日の1ヶ月前から終了日まで
+    if (!is.na(end_d)) {
+      end_start_d <- end_d - months(1)
+      end_data <- calc_data %>% filter(as.Date(Timestamp) >= end_start_d & as.Date(Timestamp) <= end_d)
+
+      if (nrow(end_data) > 0) {
+        max_row <- end_data[which.max(end_data$M2PI4410W), ]
+
+        col_end <- grep("詰まり本数_後半", names(campaigns), value=TRUE)[1]
+        nos_val <- as.numeric(campaigns[i, col_end])
+
+        campaign_results <- rbind(campaign_results, data.frame(
+          Period = period,
+          Type = "End",
+          PeriodType = paste0(period, "_End"),
+          Timestamp = max_row$Timestamp,
+          Max_Jacket_P = max_row$M2PI4410W,
+          U_Value = max_row$U,
+          NoS = nos_val
+        ))
+      }
+    }
+  }
+
+  # 結果のテーブル表示
+  if (nrow(campaign_results) > 0) {
+    library(htmltools)
+
+    dt <- datatable(
+      campaign_results,
+      options = list(pageLength = 10, autoWidth = TRUE, scrollX = TRUE),
+      caption = "キャンペーン期間ごとの最大ジャケット圧力抽出結果",
+      rownames = FALSE
+    ) %>%
+      formatRound(columns = c("Max_Jacket_P", "U_Value"), digits = 2) %>%
+      formatDate("Timestamp", method = "toLocaleString")
+
+    print(tagList(dt))
+
+    # 散布図の作成 (最大ジャケット圧力 vs U値)
+    p_campaign <- ggplot(campaign_results, aes(x = Max_Jacket_P, y = U_Value)) +
+      geom_point(aes(color = Type, size = NoS), alpha = 0.7) +
+      geom_smooth(method = "lm", se = TRUE, color = "blue", fill = "lightblue", alpha = 0.3) +
+      labs(
+        title = "キャンペーン期間ごとの最大ジャケット圧力とU値の相関",
+        subtitle = "各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ",
+        x = "最大ジャケット圧力 (M2PI4410W.PV)",
+        y = "総括伝熱係数 (U値)",
+        color = "期間",
+        size = "詰まり本数(NoS)"
+      ) +
+      theme_minimal()
+
+    print(p_campaign)
+  } else {
+    print("キャンペーン評価用のデータが抽出できませんでした。")
+  }
+} else {
+  print("キャンペーン評価に必要なデータ(calc_data)または campaign_periods.csv が存在しません。")
 }
 ```
