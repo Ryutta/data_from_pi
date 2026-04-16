@@ -276,20 +276,20 @@ if (exists("calc_data") && nrow(calc_data) > 0 && file.exists("campaign_periods.
     period <- campaigns$Period[i]
     start_d <- campaigns$Start_Date[i]
     end_d <- campaigns$End_Date[i]
-
+    
     if (is.na(start_d)) next
-
+    
     # 初期 (Beginning): 開始日から1ヶ月間
     beg_end_d <- start_d + months(1)
     beg_data <- calc_data %>% filter(as.Date(Timestamp) >= start_d & as.Date(Timestamp) <= beg_end_d)
-
+    
     if (nrow(beg_data) > 0) {
       max_row <- beg_data[which.max(beg_data$M2PI4410W), ]
-
-      # Use check.names=FALSE style or matching the literal name
+      
+      # Use check.names=FALSE style or matching the literal name 
       col_beg <- grep("詰まり本数_前半", names(campaigns), value=TRUE)[1]
       nos_val <- as.numeric(campaigns[i, col_beg])
-
+      
       campaign_results <- rbind(campaign_results, data.frame(
         Period = period,
         Type = "Beginning",
@@ -300,18 +300,18 @@ if (exists("calc_data") && nrow(calc_data) > 0 && file.exists("campaign_periods.
         NoS = nos_val
       ))
     }
-
+    
     # 末期 (End): 終了日の1ヶ月前から終了日まで
     if (!is.na(end_d)) {
       end_start_d <- end_d - months(1)
       end_data <- calc_data %>% filter(as.Date(Timestamp) >= end_start_d & as.Date(Timestamp) <= end_d)
-
+      
       if (nrow(end_data) > 0) {
         max_row <- end_data[which.max(end_data$M2PI4410W), ]
-
+        
         col_end <- grep("詰まり本数_後半", names(campaigns), value=TRUE)[1]
         nos_val <- as.numeric(campaigns[i, col_end])
-
+        
         campaign_results <- rbind(campaign_results, data.frame(
           Period = period,
           Type = "End",
@@ -324,11 +324,11 @@ if (exists("calc_data") && nrow(calc_data) > 0 && file.exists("campaign_periods.
       }
     }
   }
-
+  
   # 結果のテーブル表示
   if (nrow(campaign_results) > 0) {
     library(htmltools)
-
+    
     dt <- datatable(
       campaign_results,
       options = list(pageLength = 10, autoWidth = TRUE, scrollX = TRUE),
@@ -337,11 +337,11 @@ if (exists("calc_data") && nrow(calc_data) > 0 && file.exists("campaign_periods.
     ) %>%
       formatRound(columns = c("Max_Jacket_P", "U_Value"), digits = 2) %>%
       formatDate("Timestamp", method = "toLocaleString")
-
+      
     print(tagList(dt))
-
-    # 散布図の作成 (最大ジャケット圧力 vs U値)
-    p_campaign <- ggplot(campaign_results, aes(x = Max_Jacket_P, y = U_Value)) +
+      
+    # 散布図の作成 1 (最大ジャケット圧力 vs U値)
+    p_campaign_u <- ggplot(campaign_results, aes(x = Max_Jacket_P, y = U_Value)) +
       geom_point(aes(color = Type, size = NoS), alpha = 0.7) +
       geom_smooth(method = "lm", se = TRUE, color = "blue", fill = "lightblue", alpha = 0.3) +
       labs(
@@ -353,8 +353,38 @@ if (exists("calc_data") && nrow(calc_data) > 0 && file.exists("campaign_periods.
         size = "詰まり本数(NoS)"
       ) +
       theme_minimal()
-
-    print(p_campaign)
+      
+    print(p_campaign_u)
+    
+    # 散布図の作成 2 (詰まり本数 vs ジャケット圧力)
+    p_campaign_nos_p <- ggplot(campaign_results %>% filter(!is.na(NoS)), aes(x = NoS, y = Max_Jacket_P)) +
+      geom_point(aes(color = Type), size = 3, alpha = 0.7) +
+      geom_smooth(method = "lm", se = TRUE, color = "darkred", fill = "pink", alpha = 0.3) +
+      labs(
+        title = "キャンペーン期間ごとの詰まり本数と最大ジャケット圧力の相関",
+        subtitle = "各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ",
+        x = "詰まり本数 (NoS)",
+        y = "最大ジャケット圧力 (M2PI4410W.PV)",
+        color = "期間"
+      ) +
+      theme_minimal()
+      
+    print(p_campaign_nos_p)
+    
+    # 散布図の作成 3 (詰まり本数 vs U値)
+    p_campaign_nos_u <- ggplot(campaign_results %>% filter(!is.na(NoS)), aes(x = NoS, y = U_Value)) +
+      geom_point(aes(color = Type), size = 3, alpha = 0.7) +
+      geom_smooth(method = "lm", se = TRUE, color = "darkgreen", fill = "lightgreen", alpha = 0.3) +
+      labs(
+        title = "キャンペーン期間ごとの詰まり本数とU値の相関",
+        subtitle = "各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ",
+        x = "詰まり本数 (NoS)",
+        y = "総括伝熱係数 (U値)",
+        color = "期間"
+      ) +
+      theme_minimal()
+      
+    print(p_campaign_nos_u)
   } else {
     print("キャンペーン評価用のデータが抽出できませんでした。")
   }
