@@ -73,7 +73,7 @@ get_web_id <- function(tag_name) {
   return(content_json$WebId)
 }
 
-get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01T00:00:00+09:00", end_time = "*", interval = "1d") {
+get_interpolated_data <- function(web_id, tag_name, start_time = "2021-01-01T00:00:00+09:00", end_time = "*", interval = "1d") {
   url <- paste0(PI_WEB_API_BASE_URL, "/streams/", web_id, "/interpolated")
 
   response <- GET(url, query = list(startTime = start_time, endTime = end_time, interval = interval),
@@ -125,7 +125,7 @@ get_interpolated_data <- function(web_id, tag_name, start_time = "2023-01-01T00:
 
 ## ステップ 4: データ取得の実行
 
-定義したタグのリストをループ処理し、WebIDを取得した後、2023年以降の日次データ（`interval = "1d"`）を取得します。
+定義したタグのリストをループ処理し、WebIDを取得した後、2021年以降の日次データ（`interval = "1d"`）を取得します。
 
 ```{r fetch_data}
 all_data <- data.frame()
@@ -256,5 +256,215 @@ if (exists("calc_data") && nrow(calc_data) > 0) {
     formatDate("Timestamp", method = "toLocaleString")
 } else {
   print("表示できる計算結果がありません。")
+}
+```
+
+## ステップ 8: キャンペーン期間ごとの最大値取得と詰まり本数の評価
+
+`Campaign_Evaluation_Methodology.md` に基づき、各キャンペーンの「初期」と「末期」における最大ジャケット圧力時のデータを抽出し、U値との相関を確認します。
+
+```{r campaign_evaluation}
+if (exists("calc_data") && nrow(calc_data) > 0 && file.exists("campaign_periods.csv")) {
+  # キャンペーン期間データの読み込み
+  campaigns <- read.csv("campaign_periods.csv", stringsAsFactors = FALSE)
+  campaigns$Start_Date <- as.Date(campaigns$Start_Date)
+  campaigns$End_Date <- as.Date(campaigns$End_Date)
+
+  campaign_results <- data.frame()
+
+  for (i in 1:nrow(campaigns)) {
+    period <- campaigns$Period[i]
+    start_d <- campaigns$Start_Date[i]
+    end_d <- campaigns$End_Date[i]
+
+    if (is.na(start_d)) next
+
+    # 初期 (Beginning): 開始日から1ヶ月間
+    beg_end_d <- start_d + months(1)
+    beg_data <- calc_data %>% filter(as.Date(Timestamp) >= start_d & as.Date(Timestamp) <= beg_end_d)
+
+    if (nrow(beg_data) > 0) {
+      max_row <- beg_data[which.max(beg_data$M2PI4410W), ]
+
+      # Use check.names=FALSE style or matching the literal name
+      col_beg <- grep("詰まり本数_前半", names(campaigns), value=TRUE)[1]
+      nos_val <- as.numeric(campaigns[i, col_beg])
+
+      campaign_results <- rbind(campaign_results, data.frame(
+        Period = period,
+        Type = "Beginning",
+        PeriodType = paste0(period, "_Beginning"),
+        Timestamp = max_row$Timestamp,
+        Max_Jacket_P = max_row$M2PI4410W,
+        U_Value = max_row$U,
+        Flow_Rate = max_row$pump_flow,
+        NoS = nos_val
+      ))
+    }
+
+    # 末期 (End): 終了日の1ヶ月前から終了日まで
+    if (!is.na(end_d)) {
+      end_start_d <- end_d - months(1)
+      end_data <- calc_data %>% filter(as.Date(Timestamp) >= end_start_d & as.Date(Timestamp) <= end_d)
+
+      if (nrow(end_data) > 0) {
+        max_row <- end_data[which.max(end_data$M2PI4410W), ]
+
+        col_end <- grep("詰まり本数_後半", names(campaigns), value=TRUE)[1]
+        nos_val <- as.numeric(campaigns[i, col_end])
+
+        campaign_results <- rbind(campaign_results, data.frame(
+          Period = period,
+          Type = "End",
+          PeriodType = paste0(period, "_End"),
+          Timestamp = max_row$Timestamp,
+          Max_Jacket_P = max_row$M2PI4410W,
+          U_Value = max_row$U,
+          Flow_Rate = max_row$pump_flow,
+          NoS = nos_val
+        ))
+      }
+    }
+  }
+
+  # 結果のテーブル表示
+  if (nrow(campaign_results) > 0) {
+    library(htmltools)
+
+    dt <- datatable(
+      campaign_results,
+      options = list(pageLength = 10, autoWidth = TRUE, scrollX = TRUE),
+      caption = "キャンペーン期間ごとの最大ジャケット圧力抽出結果",
+      rownames = FALSE
+    ) %>%
+      formatRound(columns = c("Max_Jacket_P", "U_Value"), digits = 2) %>%
+      formatDate("Timestamp", method = "toLocaleString")
+
+    print(tagList(dt))
+
+    # 散布図の作成 1 (最大ジャケット圧力 vs U値)
+    p_campaign_u <- ggplot(campaign_results, aes(x = Max_Jacket_P, y = U_Value)) +
+      geom_point(aes(color = Type, size = NoS), alpha = 0.7) +
+      geom_smooth(method = "lm", se = TRUE, color = "blue", fill = "lightblue", alpha = 0.3) +
+      labs(
+        title = "キャンペーン期間ごとの最大ジャケット圧力とU値の相関",
+        subtitle = "各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ",
+        x = "最大ジャケット圧力 (M2PI4410W.PV)",
+        y = "総括伝熱係数 (U値)",
+        color = "期間",
+        size = "詰まり本数(NoS)"
+      ) +
+      theme_minimal()
+
+    print(p_campaign_u)
+
+    # 相関分析結果を保存するリスト
+    model_stats <- data.frame(
+      Parameter = character(),
+      R2 = numeric(),
+      p_value = numeric(),
+      Equation = character(),
+      stringsAsFactors = FALSE
+    )
+
+    # 散布図の作成 2 (最大ジャケット圧力 vs 詰まり本数)
+    valid_nos_p <- campaign_results %>% filter(!is.na(NoS), !is.na(Max_Jacket_P))
+    if(nrow(valid_nos_p) > 2) {
+      model_p <- lm(NoS ~ Max_Jacket_P, data = valid_nos_p)
+      sum_p <- summary(model_p)
+      r2_p <- sum_p$r.squared
+      pval_p <- sum_p$coefficients[2, 4]
+      eq_p <- sprintf("y = %.2fx %s %.2f", coef(model_p)[2], ifelse(coef(model_p)[1] >= 0, "+", "-"), abs(coef(model_p)[1]))
+      stats_str_p <- sprintf("回帰式: %s | R^2 = %.3f | p-value = %.3f", eq_p, r2_p, pval_p)
+
+      model_stats <- rbind(model_stats, data.frame(Parameter = "ジャケット圧力", R2 = r2_p, p_value = pval_p, Equation = eq_p))
+
+      p_campaign_nos_p <- ggplot(valid_nos_p, aes(x = Max_Jacket_P, y = NoS)) +
+        geom_point(aes(color = Type), size = 3, alpha = 0.7) +
+        geom_smooth(method = "lm", se = TRUE, color = "darkred", fill = "pink", alpha = 0.3) +
+        labs(
+          title = "キャンペーン期間ごとの最大ジャケット圧力と詰まり本数の相関",
+          subtitle = paste("各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ\n", stats_str_p),
+          x = "最大ジャケット圧力 (M2PI4410W.PV)",
+          y = "詰まり本数 (NoS)",
+          color = "期間"
+        ) +
+        theme_minimal()
+
+      print(p_campaign_nos_p)
+    }
+
+    # 散布図の作成 3 (U値 vs 詰まり本数)
+    valid_nos_u <- campaign_results %>% filter(!is.na(NoS), !is.na(U_Value))
+    if(nrow(valid_nos_u) > 2) {
+      model_u <- lm(NoS ~ U_Value, data = valid_nos_u)
+      sum_u <- summary(model_u)
+      r2_u <- sum_u$r.squared
+      pval_u <- sum_u$coefficients[2, 4]
+      eq_u <- sprintf("y = %.2fx %s %.2f", coef(model_u)[2], ifelse(coef(model_u)[1] >= 0, "+", "-"), abs(coef(model_u)[1]))
+      stats_str_u <- sprintf("回帰式: %s | R^2 = %.3f | p-value = %.3f", eq_u, r2_u, pval_u)
+
+      model_stats <- rbind(model_stats, data.frame(Parameter = "U値", R2 = r2_u, p_value = pval_u, Equation = eq_u))
+
+      p_campaign_nos_u <- ggplot(valid_nos_u, aes(x = U_Value, y = NoS)) +
+        geom_point(aes(color = Type), size = 3, alpha = 0.7) +
+        geom_smooth(method = "lm", se = TRUE, color = "darkgreen", fill = "lightgreen", alpha = 0.3) +
+        labs(
+          title = "キャンペーン期間ごとのU値と詰まり本数の相関",
+          subtitle = paste("各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ\n", stats_str_u),
+          x = "総括伝熱係数 (U値)",
+          y = "詰まり本数 (NoS)",
+          color = "期間"
+        ) +
+        theme_minimal()
+
+      print(p_campaign_nos_u)
+    }
+
+    # 散布図の作成 4 (ポンプ流量 vs 詰まり本数)
+    valid_nos_f <- campaign_results %>% filter(!is.na(NoS), !is.na(Flow_Rate))
+    if(nrow(valid_nos_f) > 2) {
+      model_f <- lm(NoS ~ Flow_Rate, data = valid_nos_f)
+      sum_f <- summary(model_f)
+      r2_f <- sum_f$r.squared
+      pval_f <- sum_f$coefficients[2, 4]
+      eq_f <- sprintf("y = %.2fx %s %.2f", coef(model_f)[2], ifelse(coef(model_f)[1] >= 0, "+", "-"), abs(coef(model_f)[1]))
+      stats_str_f <- sprintf("回帰式: %s | R^2 = %.3f | p-value = %.3f", eq_f, r2_f, pval_f)
+
+      model_stats <- rbind(model_stats, data.frame(Parameter = "ポンプ流量", R2 = r2_f, p_value = pval_f, Equation = eq_f))
+
+      p_campaign_nos_f <- ggplot(valid_nos_f, aes(x = Flow_Rate, y = NoS)) +
+        geom_point(aes(color = Type), size = 3, alpha = 0.7) +
+        geom_smooth(method = "lm", se = TRUE, color = "purple", fill = "thistle", alpha = 0.3) +
+        labs(
+          title = "キャンペーン期間ごとのポンプ流量と詰まり本数の相関",
+          subtitle = paste("各キャンペーンの初期(1ヶ月)・末期(1ヶ月)における最大ジャケット圧力時のデータ\n", stats_str_f),
+          x = "ポンプ流量 (pump_flow)",
+          y = "詰まり本数 (NoS)",
+          color = "期間"
+        ) +
+        theme_minimal()
+
+      print(p_campaign_nos_f)
+    }
+
+    # 詰まり本数との相関モデル比較の表示
+    if (nrow(model_stats) > 0) {
+      model_stats <- model_stats %>% arrange(desc(R2))
+
+      print(datatable(
+        model_stats,
+        options = list(pageLength = 5, autoWidth = TRUE, dom = 't'),
+        caption = "詰まり本数との相関強度の比較 (R^2 降順)",
+        rownames = FALSE
+      ) %>%
+        formatRound(columns = c("R2", "p_value"), digits = 3))
+    }
+
+  } else {
+    print("キャンペーン評価用のデータが抽出できませんでした。")
+  }
+} else {
+  print("キャンペーン評価に必要なデータ(calc_data)または campaign_periods.csv が存在しません。")
 }
 ```
