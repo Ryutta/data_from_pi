@@ -468,3 +468,79 @@ if (exists("calc_data") && nrow(calc_data) > 0 && file.exists("campaign_periods.
   print("キャンペーン評価に必要なデータ(calc_data)または campaign_periods.csv が存在しません。")
 }
 ```
+
+## ステップ 9: 予測モデルの構築と評価 (2502期の予測)
+
+2310以前のデータを訓練データ（学習データ）として線形回帰モデルを構築し、2502期（テストデータ）の詰まり本数を予測します。実際の2502期の詰まり本数（48本）と比較し、モデルの予測精度を評価します。
+
+```{r model_evaluation}
+if (exists("campaign_results") && nrow(campaign_results) > 0) {
+  
+  # 訓練データ: Periodが2310以下、かつNoSに欠損値がない行
+  train_data <- campaign_results %>% 
+    filter(as.numeric(Period) <= 2310, !is.na(NoS))
+  
+  # テストデータの抽出: 2502期のデータ
+  test_data_base <- campaign_results %>% filter(Period == "2502")
+  
+  # テストデータの予測変数を取得 (初期と末期で分かれている場合は、予測したいフェーズに合わせますが、ここでは最大値を持つ行を採用するか、テストデータ群として扱います。依頼の意図としては2502期のある特定時点での予測値と実測値の比較と考えられますので、テストデータとして利用可能な行ごとに予測を行います。)
+  
+  if (nrow(train_data) > 2 && nrow(test_data_base) > 0) {
+    # 実際の値
+    actual_nos_2502 <- 48
+    
+    # 訓練データでのモデル構築
+    mod_p <- lm(NoS ~ Max_Jacket_P, data = train_data)
+    mod_u <- lm(NoS ~ U_Value, data = train_data)
+    mod_f <- lm(NoS ~ Flow_Rate, data = train_data)
+    
+    eval_results <- data.frame()
+    
+    for(i in 1:nrow(test_data_base)) {
+      row_data <- test_data_base[i, ]
+      
+      # 予測の実行
+      pred_p <- predict(mod_p, newdata = row_data)
+      pred_u <- predict(mod_u, newdata = row_data)
+      pred_f <- predict(mod_f, newdata = row_data)
+      
+      # 評価指標 (絶対誤差と絶対誤差率 MAPE)
+      error_p <- abs(pred_p - actual_nos_2502)
+      error_u <- abs(pred_u - actual_nos_2502)
+      error_f <- abs(pred_f - actual_nos_2502)
+      
+      mape_p <- (error_p / actual_nos_2502) * 100
+      mape_u <- (error_u / actual_nos_2502) * 100
+      mape_f <- (error_f / actual_nos_2502) * 100
+      
+      eval_results <- rbind(eval_results, data.frame(
+        PeriodType = row_data$PeriodType,
+        Actual_NoS = actual_nos_2502,
+        Predictor = c("ジャケット圧力", "U値", "ポンプ流量"),
+        Predicted_NoS = c(pred_p, pred_u, pred_f),
+        Absolute_Error = c(error_p, error_u, error_f),
+        MAPE_Percent = c(mape_p, mape_u, mape_f)
+      ))
+    }
+    
+    # MAPEで昇順ソートして最も精度が良いものを上に
+    eval_results <- eval_results %>% arrange(MAPE_Percent)
+    
+    print(datatable(
+      eval_results,
+      options = list(pageLength = 10, autoWidth = TRUE, scrollX = TRUE),
+      caption = "2502期の予測モデル評価結果 (実際の詰まり本数: 48本)",
+      rownames = FALSE
+    ) %>%
+      formatRound(columns = c("Predicted_NoS", "Absolute_Error", "MAPE_Percent"), digits = 2))
+      
+    # 評価コメントの自動生成
+    best_model <- eval_results[1, ]
+    cat(sprintf("\n**評価コメント:**\n一般的な評価指標（MAPE: 平均絶対パーセント誤差）に照らすと、%sの時の '%s' を使ったモデルが最も誤差が少なく、予測値は約 %.1f 本（誤差 %.1f%%）となりました。MAPEが10%%〜20%%未満であれば「良い予測モデル」、20%%〜50%%未満は「妥当な予測モデル」、50%%以上は「不正確な予測モデル」と一般的に解釈されます。\n", 
+                best_model$PeriodType, best_model$Predictor, best_model$Predicted_NoS, best_model$MAPE_Percent))
+                
+  } else {
+    print("モデルの訓練に必要な2310以前のデータ、または2502期のテストデータが不足しています。")
+  }
+}
+```
