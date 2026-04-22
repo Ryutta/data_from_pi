@@ -523,21 +523,45 @@ if (exists("campaign_results") && nrow(campaign_results) > 0) {
       ))
     }
     
+    # 評価結果の列を追加
+    eval_results <- eval_results %>% mutate(
+      Evaluation = case_when(
+        MAPE_Percent < 10 ~ "非常に良い予測",
+        MAPE_Percent >= 10 & MAPE_Percent < 20 ~ "良い予測",
+        MAPE_Percent >= 20 & MAPE_Percent < 50 ~ "妥当な予測",
+        TRUE ~ "不正確な予測"
+      )
+    )
+
+    # 列名を日本語に変更してわかりやすくする
+    eval_results_display <- eval_results %>%
+      rename(
+        `期間` = PeriodType,
+        `実際の詰まり本数` = Actual_NoS,
+        `予測に使用した指標` = Predictor,
+        `予想本数` = Predicted_NoS,
+        `誤差（絶対値）` = Absolute_Error,
+        `誤差率 (MAPE %)` = MAPE_Percent,
+        `評価結果` = Evaluation
+      )
+
     # MAPEで昇順ソートして最も精度が良いものを上に
-    eval_results <- eval_results %>% arrange(MAPE_Percent)
+    eval_results_display <- eval_results_display %>% arrange(`誤差率 (MAPE %)`)
     
-    print(datatable(
-      eval_results,
+    dt_eval <- datatable(
+      eval_results_display,
       options = list(pageLength = 10, autoWidth = TRUE, scrollX = TRUE),
       caption = "2502期の予測モデル評価結果 (実際の詰まり本数: 48本)",
       rownames = FALSE
     ) %>%
-      formatRound(columns = c("Predicted_NoS", "Absolute_Error", "MAPE_Percent"), digits = 2))
+      formatRound(columns = c("予想本数", "誤差（絶対値）", "誤差率 (MAPE %)"), digits = 2)
+
+    print(htmltools::tagList(dt_eval))
       
     # 評価コメントの自動生成
-    best_model <- eval_results[1, ]
-    cat(sprintf("\n**評価コメント:**\n一般的な評価指標（MAPE: 平均絶対パーセント誤差）に照らすと、%sの時の '%s' を使ったモデルが最も誤差が少なく、予測値は約 %.1f 本（誤差 %.1f%%）となりました。MAPEが10%%〜20%%未満であれば「良い予測モデル」、20%%〜50%%未満は「妥当な予測モデル」、50%%以上は「不正確な予測モデル」と一般的に解釈されます。\n", 
-                best_model$PeriodType, best_model$Predictor, best_model$Predicted_NoS, best_model$MAPE_Percent))
+    best_model <- eval_results %>% arrange(MAPE_Percent) %>% slice(1)
+    cat(sprintf("\n**評価コメント:**\n一般的な評価指標（MAPE: 平均絶対パーセント誤差）に照らすと、%sの時の '%s' を使ったモデルが最も誤差が少なく、予測値は約 %.1f 本（誤差 %.1f%%、評価: %s）となりました。\n※ 評価基準: MAPEが10%%未満で「非常に良い」、10%%〜20%%未満で「良い」、20%%〜50%%未満で「妥当」、50%%以上で「不正確」としています。\n",
+                best_model$PeriodType, best_model$Predictor, best_model$Predicted_NoS, best_model$MAPE_Percent, best_model$Evaluation))
                 
   } else {
     print("モデルの訓練に必要な2310以前のデータ、または2502期のテストデータが不足しています。")
