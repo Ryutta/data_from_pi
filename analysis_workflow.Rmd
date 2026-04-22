@@ -532,7 +532,7 @@ if (exists("campaign_results") && nrow(campaign_results) > 0) {
         TRUE ~ "不正確な予測"
       )
     )
-
+    
     # 列名を日本語に変更してわかりやすくする
     eval_results_display <- eval_results %>%
       rename(
@@ -544,25 +544,23 @@ if (exists("campaign_results") && nrow(campaign_results) > 0) {
         `誤差率 (MAPE %)` = MAPE_Percent,
         `評価結果` = Evaluation
       )
-
+    
     # MAPEで昇順ソートして最も精度が良いものを上に
     eval_results_display <- eval_results_display %>% arrange(`誤差率 (MAPE %)`)
     
-    dt_eval <- datatable(
+    # 評価コメントの自動生成 (表の前に出力)
+    best_model <- eval_results %>% arrange(MAPE_Percent) %>% slice(1)
+    cat(sprintf("\n**評価コメント:**\n一般的な評価指標（MAPE: 平均絶対パーセント誤差）に照らすと、%sの時の '%s' を使ったモデルが最も誤差が少なく、予測値は約 %.1f 本（誤差 %.1f%%、評価: %s）となりました。\n※ 評価基準: MAPEが10%%未満で「非常に良い」、10%%〜20%%未満で「良い」、20%%〜50%%未満で「妥当」、50%%以上で「不正確」としています。\n\n", 
+                best_model$PeriodType, best_model$Predictor, best_model$Predicted_NoS, best_model$MAPE_Percent, best_model$Evaluation))
+                
+    datatable(
       eval_results_display,
       options = list(pageLength = 10, autoWidth = TRUE, scrollX = TRUE),
       caption = "2502期の予測モデル評価結果 (実際の詰まり本数: 48本)",
       rownames = FALSE
     ) %>%
       formatRound(columns = c("予想本数", "誤差（絶対値）", "誤差率 (MAPE %)"), digits = 2)
-
-    print(htmltools::tagList(dt_eval))
       
-    # 評価コメントの自動生成
-    best_model <- eval_results %>% arrange(MAPE_Percent) %>% slice(1)
-    cat(sprintf("\n**評価コメント:**\n一般的な評価指標（MAPE: 平均絶対パーセント誤差）に照らすと、%sの時の '%s' を使ったモデルが最も誤差が少なく、予測値は約 %.1f 本（誤差 %.1f%%、評価: %s）となりました。\n※ 評価基準: MAPEが10%%未満で「非常に良い」、10%%〜20%%未満で「良い」、20%%〜50%%未満で「妥当」、50%%以上で「不正確」としています。\n",
-                best_model$PeriodType, best_model$Predictor, best_model$Predicted_NoS, best_model$MAPE_Percent, best_model$Evaluation))
-                
   } else {
     print("モデルの訓練に必要な2310以前のデータ、または2502期のテストデータが不足しています。")
   }
