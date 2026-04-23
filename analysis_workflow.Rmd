@@ -487,7 +487,7 @@ if (exists("campaign_results") && nrow(campaign_results) > 0) {
   
   if (nrow(train_data) > 2 && nrow(test_data_base) > 0) {
     # 実際の値
-    actual_nos_2502 <- 48
+    actual_nos_2502 <- 47
     
     # 訓練データでのモデル構築
     mod_p <- lm(NoS ~ Max_Jacket_P, data = train_data)
@@ -556,7 +556,7 @@ if (exists("campaign_results") && nrow(campaign_results) > 0) {
     datatable(
       eval_results_display,
       options = list(pageLength = 10, autoWidth = TRUE, scrollX = TRUE),
-      caption = "2502期の予測モデル評価結果 (実際の詰まり本数: 48本)",
+      caption = "2502期の予測モデル評価結果 (実際の詰まり本数: 47本)",
       rownames = FALSE
     ) %>%
       formatRound(columns = c("予想本数", "誤差（絶対値）", "誤差率 (MAPE %)"), digits = 2)
